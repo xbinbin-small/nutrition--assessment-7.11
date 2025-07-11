@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm audit:*)",
+      "Bash(pip3:*)",
+      "Bash(npm run dev:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(pip install:*)",
+      "Bash(timeout 10 npm run dev)",
+      "Bash(true)",
+      "Bash(ls:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": []
+  }
+}

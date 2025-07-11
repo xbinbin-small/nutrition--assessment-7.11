@@ -1,0 +1,9 @@
+pyautogen
+python-dotenv
+openai
+google-genai
+vertexai
+Pillow
+jsonschema
+httpx>=0.28.1
+certifi>=2025.6.15

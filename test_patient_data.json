@@ -1,0 +1,161 @@
+{
+  "document_type": "综合病例",
+  "patient_info": {
+    "height_cm": 164,
+    "weight_kg": 55,
+    "bmi": 20.45
+  },
+  "diagnoses": [
+    {
+      "type": "入院诊断",
+      "description": "1. 陈旧性下壁心肌梗死"
+    },
+    {
+      "type": "入院诊断", 
+      "description": "2. 冠状动脉粥样硬化性心脏病"
+    },
+    {
+      "type": "目前诊断",
+      "description": "1. 冠状动脉粥样硬化性心脏病 急性非ST段抬高型心肌梗死 Killip I级"
+    },
+    {
+      "type": "目前诊断",
+      "description": "2. 高血压 3级 极高危组"
+    },
+    {
+      "type": "目前诊断", 
+      "description": "3. 2型糖尿病"
+    }
+  ],
+  "symptoms_and_history": {
+    "chief_complaint": "缘于入院前10天无明显诱因出现活动后胸闷、胸痛",
+    "history_of_present_illness_summary": "患者10天前出现活动后胸闷胸痛，为心前区压榨痛，向左下肢放射，伴大汗，持续数分钟后可自行缓解。入院诊断为陈旧性下壁心梗、冠心病等。诊疗经过包括冠脉造影及支架植入术（LAD、RCA）。目前高钾状态。"
+  },
+  "lab_results": {
+    "biochemistry": [
+      {
+        "name": "白蛋白",
+        "value": "34.30",
+        "unit": "g/L",
+        "interpretation": "↓"
+      },
+      {
+        "name": "γ-谷氨酰转移酶",
+        "value": "187.7", 
+        "unit": "U/L",
+        "interpretation": "↑"
+      },
+      {
+        "name": "甘油三酯",
+        "value": "2.75",
+        "unit": "g/L", 
+        "interpretation": "↑"
+      },
+      {
+        "name": "低密度脂蛋白胆固醇",
+        "value": "3.06",
+        "unit": "mmol/L",
+        "interpretation": "↓"
+      },
+      {
+        "name": "载脂蛋白A1",
+        "value": "0.77",
+        "unit": "g/L",
+        "interpretation": "↓"
+      },
+      {
+        "name": "血糖",
+        "value": "12.65", 
+        "unit": "mmol/L",
+        "interpretation": "↑"
+      },
+      {
+        "name": "乳酸脱氢酶",
+        "value": "401.8",
+        "unit": "U/L",
+        "interpretation": "↑"
+      },
+      {
+        "name": "尿素",
+        "value": "13.30",
+        "unit": "mmol/L",
+        "interpretation": "↑"
+      },
+      {
+        "name": "肌酐", 
+        "value": "129.2",
+        "unit": "umol/L",
+        "interpretation": "↑"
+      },
+      {
+        "name": "钾",
+        "value": "4.37",
+        "unit": "mmol/L",
+        "interpretation": null
+      },
+      {
+        "name": "钠",
+        "value": "154.30",
+        "unit": "mmol/L",
+        "interpretation": "↑"
+      },
+      {
+        "name": "C-反应蛋白",
+        "value": "292.80",
+        "unit": "mg/L", 
+        "interpretation": "↑"
+      }
+    ],
+    "complete_blood_count": [
+      {
+        "name": "白细胞计数",
+        "value": "10.04",
+        "unit": "10^9/L",
+        "interpretation": "↑"
+      },
+      {
+        "name": "中性粒细胞计数",
+        "value": "8.64",
+        "unit": "10^9/L",
+        "interpretation": "↑"
+      },
+      {
+        "name": "淋巴细胞比值",
+        "value": "7.6",
+        "unit": "%",
+        "interpretation": "↓"
+      },
+      {
+        "name": "血红蛋白",
+        "value": "85",
+        "unit": "g/L",
+        "interpretation": "↓"
+      },
+      {
+        "name": "血小板计数", 
+        "value": "405",
+        "unit": "10^9/L",
+        "interpretation": "↑"
+      }
+    ],
+    "stool_routine": [
+      {
+        "name": "隐血",
+        "value": "阳性",
+        "interpretation": "↑"
+      }
+    ]
+  },
+  "treatment_plan": {
+    "summary": "患者行DSA下冠脉主动脉造影+PCI术，LAD中段、RCA中段各置入支架一枚。术后予以抗凝、抗血小板、抗感染、营养支持等治疗。目前肾功能稳定，转入我科进一步观察治疗。",
+    "key_medications": null
+  },
+  "consultation_record": {
+    "department": "临床营养科",
+    "purpose": "患者目前胃肠道置入状态，请示贵科评估营养方案。",
+    "findings_and_conclusion": "患者身高164cm，体重约55kg，BMI：20.45。近期实验室检查示：白蛋白34.3g/L, 血红蛋白85g/L, 肌酐129.2umol/L, 钠154.3mmol/L。NRS2002评分为存在营养风险，营养评估提示营养不良。",
+    "recommendations": "推荐全天总能量1600-1700kcal，蛋白65-70g，早期、中、晚三餐由营养食堂提供低钠配方肠内营养粉，提供能量850kcal，蛋白13.5g。若患者肠内耐受良好，可在两餐中间喂养能全素。",
+    "NRS2002_score": 4,
+    "PES_statement_summary": "营养评估提示营养不良"
+  }
+}

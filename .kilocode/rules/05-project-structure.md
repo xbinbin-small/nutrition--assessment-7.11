@@ -1,0 +1,28 @@
+- **前端结构**:
+    - **React 组件**:
+        - 页面组件: 位于 `/src/app` 目录下的相应路由文件夹中
+        - 可重用组件: 放置在 `/src/components` 目录下，按功能/模块组织
+    - **样式文件**:
+        - Tailwind 配置: 项目根目录的 `tailwind.config.js`
+        - 全局 CSS: `/src/app/globals.css`
+    - **工具函数**: `/src/lib` 或 `/src/utils` 目录
+    - **类型定义**: `/src/types` 或 `@types` 目录
+    - **静态资源**: `/public` 目录
+    - **API 路由**: `/src/app/api` 目录
+
+- **后端结构**:
+    - **智能体代码**:
+        - 主入口: `/backend/main.py` (包含 CNA_Coordinator 和执行逻辑)
+        - 智能体模块: `/backend/agents/` 目录 (每个智能体一个文件)
+            - `clinical_context_analyzer.py`
+            - `anthropometric_evaluator.py`
+            - `biochemical_interpreter.py`
+            - `dietary_assessor.py`
+            - `diagnostic_reporter.py`
+    - **工具函数**: `/backend/utils/` 目录
+    - **配置文件**: `/backend/config.py` (包含模型选择等配置)
+
+- **项目根目录**:
+    - 环境文件: `.env` (包含 Gemini API 密钥等敏感信息)
+    - 包管理: `package.json` (前端), `requirements.txt` (后端)
+    - 构建配置: `next.config.js`, `tailwind.config.js`
