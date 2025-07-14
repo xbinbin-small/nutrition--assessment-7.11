@@ -1,7 +1,7 @@
 pyautogen
 python-dotenv
 openai
-google-genai
+google-generativeai
 vertexai
 Pillow
 jsonschema

@@ -79,19 +79,27 @@ if __name__ == "__main__":
 
         parsed_data = json.loads(input_data)
         
+        # 检查是否包含图像数据
+        image_data = None
         patient_json = None
-        if isinstance(parsed_data, list):
+        
+        if isinstance(parsed_data, dict) and "patientData" in parsed_data and "imageData" in parsed_data:
+            # 新格式：包含患者数据和图像数据
+            patient_json = parsed_data["patientData"]
+            image_data = parsed_data["imageData"]
+        elif isinstance(parsed_data, list):
+            # 旧格式：文档列表
             patient_json = consolidate_patient_data(parsed_data)
         elif isinstance(parsed_data, dict):
-            # If it's a single object, assume it's already in the correct format
+            # 旧格式：单个患者数据对象
             patient_json = parsed_data
         
         if patient_json is None:
             print(json.dumps({"error": "Invalid patient data format. Expected a JSON object or a list of documents."}), file=sys.stderr)
             sys.exit(1)
 
-        # Initialize coordinator and run assessment
-        coordinator = CNA_Coordinator(patient_json, llm_config_pro, llm_config_flash)
+        # 初始化协调器并运行评估（可选传入图像数据）
+        coordinator = CNA_Coordinator(patient_json, llm_config_pro, llm_config_flash, image_data=image_data)
         result = coordinator.run_assessment()
         
         # Print final result to stdout

@@ -9,6 +9,7 @@ from .anthropometric_evaluator import AnthropometricEvaluator
 from .biochemical_interpreter import BiochemicalInterpreter
 from .dietary_assessor import DietaryAssessor
 from .diagnostic_reporter import DiagnosticReporter
+from .image_recognizer import ImageRecognizer
 
 
 class CNA_Coordinator:
@@ -24,7 +25,7 @@ class CNA_Coordinator:
     - 提供数据追溯性管理
     """
     
-    def __init__(self, patient_data: Dict[str, Any], llm_config_pro: Dict, llm_config_flash: Dict):
+    def __init__(self, patient_data: Dict[str, Any], llm_config_pro: Dict, llm_config_flash: Dict, image_data: Optional[Dict[str, Any]] = None):
         """
         初始化CNA协调器
         
@@ -32,8 +33,11 @@ class CNA_Coordinator:
             patient_data: 患者数据
             llm_config_pro: Pro模型配置
             llm_config_flash: Flash模型配置
+            image_data: 可选的图像数据（包含images或file_paths）
         """
         self.patient_data = patient_data
+        self.image_data = image_data
+        self.image_recognition_results = None
         self.intermediate_results = {}
         self.data_trace = {}  # 数据追溯映射
         self.session_id = str(uuid.uuid4())
@@ -72,6 +76,7 @@ class CNA_Coordinator:
         self.biochemical_interpreter = BiochemicalInterpreter(llm_config=llm_config_flash)
         self.dietary_assessor = DietaryAssessor(llm_config=llm_config_flash)
         self.diagnostic_reporter = DiagnosticReporter(llm_config=llm_config_pro)
+        self.image_recognizer = ImageRecognizer(llm_config=llm_config_flash)
         
         # 验证数据完整性
         self.validation_results = self._validate_data()
@@ -172,6 +177,55 @@ class CNA_Coordinator:
                     "session_id": self.session_id
                 }
             
+            # 步骤0: 图像识别（如果提供了图像数据）
+            if self.image_data:
+                image_trace_id = self._generate_trace_id("ImageRecognizer", "image_recognition")
+                self.image_recognition_results = self.image_recognizer.process(self.image_data)
+                self._add_trace_record(
+                    image_trace_id,
+                    "ImageRecognizer",
+                    {"image_count": len(self.image_data.get("images", self.image_data.get("file_paths", [])))},
+                    self.image_recognition_results
+                )
+                
+                # 如果图像识别成功，整合识别结果到患者数据中
+                if self.image_recognition_results.get("success", False):
+                    recognized_data = self.image_recognition_results.get("data", {})
+                    integrated_data = recognized_data.get("integrated_data", {})
+                    
+                    # 整合识别的数据到患者数据中
+                    if integrated_data:
+                        # 更新患者基本信息
+                        if "patient_info" not in self.patient_data:
+                            self.patient_data["patient_info"] = {}
+                        
+                        for key in ["height_cm", "weight_kg", "bmi"]:
+                            if key in integrated_data:
+                                self.patient_data["patient_info"][key] = integrated_data[key]
+                        
+                        # 整合诊断信息
+                        if "diagnoses" in integrated_data:
+                            if "diagnoses" not in self.patient_data:
+                                self.patient_data["diagnoses"] = []
+                            self.patient_data["diagnoses"].extend(integrated_data["diagnoses"])
+                        
+                        # 整合实验室结果
+                        if "lab_results" in integrated_data:
+                            if "lab_results" not in self.patient_data:
+                                self.patient_data["lab_results"] = {}
+                            self.patient_data["lab_results"].update(integrated_data["lab_results"])
+                        
+                        # 整合NRS2002评分
+                        if "NRS2002_score" in integrated_data:
+                            if "consultation_record" not in self.patient_data:
+                                self.patient_data["consultation_record"] = {}
+                            self.patient_data["consultation_record"]["NRS2002_score"] = integrated_data["NRS2002_score"]
+                
+                self.intermediate_results['image_recognition'] = {
+                    "data": self.image_recognition_results,
+                    "trace_id": image_trace_id
+                }
+            
             # 步骤1: 临床背景分析
             clinical_trace_id = self._generate_trace_id("Clinical_Context_Analyzer", "clinical_analysis")
             clinical_summary = self.clinical_analyzer.analyze(self.patient_data)
@@ -264,6 +318,11 @@ class CNA_Coordinator:
             
             # 收集所有依赖
             all_trace_ids = [clinical_trace_id, anthro_trace_id, biochem_trace_id, dietary_trace_id, conflict_trace_id]
+            
+            # 如果进行了图像识别，添加图像识别的trace_id
+            if self.image_data and 'image_recognition' in self.intermediate_results:
+                image_trace_id = self.intermediate_results['image_recognition']['trace_id']
+                all_trace_ids.insert(0, image_trace_id)  # 将图像识别放在最前面
             self._add_trace_record(
                 report_trace_id,
                 "Diagnostic_Reporter",
@@ -287,6 +346,10 @@ class CNA_Coordinator:
                     "intermediate_trace_ids": all_trace_ids
                 }
             }
+            
+            # 如果进行了图像识别，添加图像识别结果到响应中
+            if self.image_recognition_results:
+                response["image_recognition_results"] = self.image_recognition_results.get("data", {})
             
             return response
             
