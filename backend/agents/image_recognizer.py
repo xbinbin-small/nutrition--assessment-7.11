@@ -230,7 +230,7 @@ class ImageRecognizer(BaseAgent):
                 genai.configure(api_key=api_key)
                 
                 # 选择模型
-                model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 
                 self.logger.info(f"使用Gemini API处理图像，API密钥前缀: {api_key[:10]}...")
                 

@@ -21,8 +21,9 @@
 - **后端智能体框架**: **autogen (微软多智能体框架)**
 - **后端编程语言**: **Python 3.9+**
 - **AI 模型策略**:
+  - **`gemini-2.5-flash`**: 用于图像识别配置(`ImageRecognizer`)和中间分析步骤(`CNA_Coordinator`和其他分析智能体)
   - **`gemini-2.5-pro`**: 用于报告生成(`Diagnostic_Reporter`)
-  - **`gemini-2.5-flash`**: 用于中间分析步骤(`CNA_Coordinator`和其他分析智能体)
+  
 - **虚拟运行环境**: Conda
 - **包管理器**: 
   - 前端: **npm**
@@ -37,8 +38,10 @@
 │   │   ├── page.tsx             # 主页面组件
 │   │   ├── globals.css          # 全局样式
 │   │   └── api/                 # API路由
-│   │       └── assessment/      
-│   │           └── route.ts     # 评估API路由
+│   │       ├── assessment/      
+│   │       │   └── route.ts     # 评估API路由
+│   │       └── recognize-single-image/
+│   │           └── route.ts     # 图像识别API路由
 │   ├── components/              # React组件
 │   │   └── ReportDisplay.tsx    # 报告显示组件
 │   ├── lib/                     # 工具函数库(预留)
@@ -48,10 +51,12 @@
 │   ├── main.py                  # 主入口文件
 │   ├── demo_main.py             # 演示版本(无需API密钥)
 │   ├── test_system.py           # 系统测试脚本
+│   ├── image_recognition_service.py  # 图像识别服务
 │   ├── config.py                # 配置管理
 │   ├── requirements.txt         # Python依赖
 │   ├── agents/                  # 智能体模块
 │   │   ├── base_agent.py        # 智能体基类
+│   │   ├── image_recognizer.py  # 图像识别智能体
 │   │   ├── cna_coordinator.py   # 中央协调器
 │   │   ├── clinical_context_analyzer.py     # 临床背景分析
 │   │   ├── clinical_context_analyzer_v2.py  # 临床背景分析v2
@@ -82,7 +87,27 @@
 
 ## 智能体系统架构
 
-### 1. CNA_Coordinator (中央协调器)
+### 1. ImageRecognizer (图像识别智能体)
+- **角色**: 识别和提取医疗文书图片中的关键信息
+- **模型**: 使用 `gemini-2.5-flash` 进行图像识别和OCR提取
+- **任务**:
+  - 识别医疗文书类型（病历、生化检查、血常规、大便常规、会诊记录、营养评估、人体测量、护理记录等）
+  - 使用OCR和AI技术提取图片中的文字信息
+  - 将非结构化的图像内容转换为结构化的JSON数据
+  - 提取关键数据和信息：
+    - 生化检查: 白蛋白、总蛋白、转氨酶、肌酐、尿素、血糖、C-反应蛋白等
+    - 血常规: 白细胞、中性粒细胞、淋巴细胞、血红蛋白、红细胞、血小板等
+    - 人体测量: 身高、体重、BMI值
+    - 营养评估: NRS2002评分、营养诊断结论
+  - 整合多张图片的识别结果
+  - 数据标准化和格式验证
+- **工作模式**:
+  - 支持批量图像处理
+  - 逐张识别，实时反馈进度
+  - 自动整合多文档数据
+  - 错误重试机制
+
+### 2. CNA_Coordinator (中央协调器)
 - **角色**: 评估过程的中央管理者
 - **任务**:
   - 接收初始请求和所有原始患者数据（疾病状态、筛查结果、实验室报告、饮食记录、人体测量数据、代谢测试结果）
@@ -136,7 +161,7 @@
   - 确定是否满足营养不良的病因标准（依据 GLIM 的食物摄入减少/吸收障碍）
   - 向 `CNA_Coordinator` 报告结构化的结果（例如，"过去一周平均能量摄入估计为需求的 55%"，"蛋白质摄入 0.7 克/公斤/天，低于 1.2 克/公斤/天的估计需求"，"报告有早饱感和恶心影响摄入"）
 
-### 6. Diagnostic_Reporter (诊断报告专家)
+### 7. Diagnostic_Reporter (诊断报告专家)
 - **角色**: 整合所有分析结果，进行营养诊断，并生成最终的综合评估报告
 - **任务**:
   - 接收来自 CNA_Coordinator 的所有专家智能体的汇总分析结果
@@ -146,6 +171,8 @@
   - 将结构化的PES声明输出给 CNA_Coordinator
 
 ## 工作流程
+
+### 基础工作流程（JSON输入模式）
 
 ```mermaid
 graph TD
@@ -167,6 +194,22 @@ graph TD
     L -->|否| N[等待或处理错误]
     M --> O[生成最终报告]
     O --> P[交付报告]
+```
+
+### 图像识别工作流程（图像输入模式）
+
+```mermaid
+graph TD
+    U[用户上传图像] -->|多张医疗文书图片| IR[ImageRecognizer]
+    IR -->|逐张识别| IR1[识别文档类型]
+    IR1 --> IR2[提取结构化数据]
+    IR2 --> IR3[数据标准化]
+    IR3 --> IR4{所有图片处理完成?}
+    IR4 -->|否| IR
+    IR4 -->|是| IR5[整合多文档数据]
+    IR5 --> UI[前端整合界面]
+    UI -->|用户确认/编辑| JSON[生成标准JSON]
+    JSON --> A[CNA_Coordinator]
 ```
 
 ### 详细流程说明
@@ -254,6 +297,8 @@ graph TD
 ## 前后端交互详解
 
 ### 前端数据提交流程
+
+#### 1. JSON输入模式
 ```typescript
 // src/app/page.tsx - 核心提交逻辑
 const handleSubmit = async () => {
@@ -281,7 +326,59 @@ const handleSubmit = async () => {
 };
 ```
 
+#### 2. 图像识别模式
+```typescript
+// src/app/page.tsx - 图像识别流程
+// 2.1 上传图像
+const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setUploadedImages(files);
+    // 初始化识别状态
+    const initialResults = files.map((file, index) => ({
+        id: `${Date.now()}_${index}`,
+        fileName: file.name,
+        status: "pending" as const,
+    }));
+    setImageRecognitionResults(initialResults);
+};
+
+// 2.2 单张识别
+const recognizeSingleImage = async (file: File, resultId: string) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    
+    const res = await fetch("/api/recognize-single-image", {
+        method: "POST",
+        body: formData,
+    });
+    
+    const result = await res.json();
+    // 更新识别结果
+    setImageRecognitionResults(prev => 
+        prev.map(r => r.id === resultId ? { 
+            ...r, 
+            status: "success", 
+            result: result 
+        } : r)
+    );
+};
+
+// 2.3 整合结果
+const handleIntegrateResults = () => {
+    // 收集所有成功的识别结果
+    const successfulResults = imageRecognitionResults
+        .filter(r => r.status === "success" && r.result)
+        .map(r => r.result);
+    
+    // 整合为JSON格式
+    const integratedData = integrateRecognitionResults(successfulResults);
+    setPatientData(JSON.stringify(integratedData, null, 2));
+};
+```
+
 ### API路由处理机制
+
+#### 1. 评估API路由
 ```typescript
 // src/app/api/assessment/route.ts - 进程通信核心
 export async function POST(request: Request) {
@@ -306,7 +403,50 @@ export async function POST(request: Request) {
 }
 ```
 
+#### 2. 图像识别API路由
+```typescript
+// src/app/api/recognize-single-image/route.ts - 图像识别处理
+export async function POST(request: Request) {
+    // 1. 接收图像文件
+    const formData = await request.formData();
+    const image = formData.get('image') as File;
+    
+    // 2. 保存临时文件
+    const tempDir = path.join(process.cwd(), 'temp');
+    const fileName = `${uuidv4()}_${image.name}`;
+    const tempFile = path.join(tempDir, fileName);
+    await writeFile(tempFile, Buffer.from(await image.arrayBuffer()));
+    
+    // 3. 调用Python图像识别服务
+    const pythonProcess = spawn('python3', ['image_recognition_service.py'], { 
+        cwd: path.join(process.cwd(), 'backend') 
+    });
+    
+    // 4. 发送图像路径
+    pythonProcess.stdin.write(JSON.stringify({ file_paths: [tempFile] }));
+    pythonProcess.stdin.end();
+    
+    // 5. 处理识别结果
+    pythonProcess.on('close', async (code) => {
+        // 清理临时文件
+        await unlink(tempFile);
+        
+        if (code === 0) {
+            const result = JSON.parse(resultData);
+            return NextResponse.json({
+                success: true,
+                document_type: result.documents[0].document_type,
+                extracted_data: result.documents[0].data,
+                integrated_data: result.integrated_data
+            });
+        }
+    });
+}
+```
+
 ### Python后端接收处理
+
+#### 1. 主评估服务
 ```python
 # backend/main.py - 数据接收和处理
 if __name__ == "__main__":
@@ -330,6 +470,32 @@ if __name__ == "__main__":
     
     # 输出结果到stdout
     print(json.dumps(result, ensure_ascii=False))
+```
+
+#### 2. 图像识别服务
+```python
+# backend/image_recognition_service.py - 图像识别入口
+def main():
+    # 从stdin读取输入数据
+    input_data = sys.stdin.read()
+    data = json.loads(input_data)
+    
+    # 创建图像识别智能体
+    image_recognizer = ImageRecognizer(llm_config=llm_config_flash)
+    
+    # 处理图像
+    recognition_result = image_recognizer.process(data)
+    
+    # 输出结果
+    if recognition_result.get("success", False):
+        output = recognition_result.get("data", {})
+    else:
+        output = {
+            "error": recognition_result.get("error", "图像识别失败"),
+            "details": recognition_result
+        }
+    
+    print(json.dumps(output, ensure_ascii=False))
 ```
 
 ## 环境配置详解
@@ -385,6 +551,7 @@ NEXT_PUBLIC_APP_NAME=智能综合营养评估系统
 ### 模型使用策略
 | 智能体 | 模型 | Temperature | 用途 |
 |--------|------|-------------|------|
+| ImageRecognizer | gemini-2.5-flash | 0.5 | 图像识别、OCR提取 |
 | CNA_Coordinator | gemini-2.5-flash | 0.5 | 协调管理、冲突检测 |
 | Clinical_Context_Analyzer | gemini-2.5-flash | 0.5 | 临床背景分析 |
 | Anthropometric_Evaluator | gemini-2.5-flash | 0.5 | 人体测量评估 |
@@ -438,6 +605,8 @@ llm_config_flash = {
 ## 数据格式规范
 
 ### 输入数据格式
+
+#### 1. 直接JSON输入格式
 输入的患者信息以以下JSON格式呈现（仅供参考）：
 ```json
 {
@@ -484,7 +653,16 @@ llm_config_flash = {
 }
 ```
 
+#### 2. 图像识别输入格式
+通过图像识别智能体处理后，会自动整合成标准JSON格式：
+- 支持多张医疗文书图片同时上传
+- 每张图片独立识别，实时显示进度
+- 识别结果自动整合为标准化JSON
+- 用户可在前端编辑确认后提交
+
 ### 输出数据格式
+
+#### 1. 营养评估报告输出
 ```json
 {
   "report": "格式化的营养评估报告文本",
@@ -504,6 +682,35 @@ llm_config_flash = {
     "total_steps": 6,
     "final_report_trace_id": "xxx",
     "intermediate_trace_ids": ["id1", "id2", ...]
+  }
+}
+```
+
+#### 2. 图像识别输出格式
+```json
+{
+  "success": true,
+  "document_type": "生化检查",
+  "extracted_data": {
+    "document_type": "生化检查",
+    "patient_info": {
+      "height_cm": 170,
+      "weight_kg": 65,
+      "bmi": 22.5
+    },
+    "lab_results": {
+      "biochemistry": [
+        {
+          "name": "白蛋白",
+          "value": "34.30",
+          "unit": "g/L",
+          "interpretation": "↓"
+        }
+      ]
+    }
+  },
+  "integrated_data": {
+    // 整合后的完整数据结构
   }
 }
 ```
@@ -558,7 +765,21 @@ python backend/test_system.py    # 运行系统测试
 
 ## 关键特性
 
-### 1. 数据追溯性
+### 1. 双输入模式
+- **JSON输入模式**: 直接粘贴或输入标准化的患者JSON数据
+- **图像识别模式**: 上传医疗文书图片，自动识别并提取数据
+  - 支持批量上传多张图片
+  - 实时显示识别进度
+  - 失败重试机制
+  - 识别结果预览与编辑
+
+### 2. 智能图像识别
+- 使用Gemini 2.5 Flash模型进行OCR和智能识别
+- 自动识别文档类型（病历、生化检查、血常规等）
+- 提取结构化数据并标准化
+- 多文档数据自动整合
+
+### 3. 数据追溯性
 - 每个分析步骤生成唯一trace_id
 - 完整的数据流转记录
 - 任何结论都可追溯到：
@@ -567,21 +788,21 @@ python backend/test_system.py    # 运行系统测试
   - 依赖的其他结论
   - 原始患者数据
 
-### 2. 智能冲突检测
+### 4. 智能冲突检测
 - 使用AI分析各智能体结果的一致性
 - 自动识别矛盾信息
 - 决策流程透明化
 
-### 3. 双模型策略
-- Flash模型处理大量中间任务(成本优化)
-- Pro模型生成最终报告(质量保证)
+### 5. 混合模型策略
+- **Gemini 2.5 Flash**: 图像识别、协调管理和中间分析任务(成本优化)
+- **Gemini 2.5 Pro**: 生成最终报告(质量保证)
 - Temperature参数差异化设置
 
-### 4. 演示模式
+### 6. 演示模式
 - `demo_main.py`无需API密钥
 - 生成模拟报告用于测试和演示
 
-### 5. 模块化设计
+### 7. 模块化设计
 - 每个智能体独立文件
 - 继承自统一基类
 - 便于测试和维护
@@ -677,7 +898,39 @@ const timeout = setTimeout(() => {
    - 确保使用UTF-8编码
    - 检查特殊字符转义
 
-## 文档搜索规范
+5. **图像识别失败**
+   - 检查图片格式（支持JPG/PNG/WEBP）
+   - 确保图片清晰可读
+   - 检查文件大小（建议<10MB）
+   - 验证Gemini API配额
+
+6. **数据整合问题**
+   - 检查识别结果格式
+   - 确保数据字段一致性
+   - 手动编辑修正错误数据
+
+## 用户界面特性
+
+### 1. 输入模式切换
+- 顶部按钮组允许在JSON输入和图像识别之间切换
+- 模式切换保留已输入的数据
+
+### 2. 图像识别界面
+- 批量上传：支持多选多张图片
+- 识别进度：实时显示每张图片的处理状态
+- 结果预览：可展开查看单张图片的识别结果
+- 重试机制：失败的图片可单独重试
+- 数据整合：一键整合所有识别结果
+
+### 3. 数据编辑
+- JSON编辑器：支持语法高亮和格式化
+- 图像识别后可编辑整合结果
+- 实时验证JSON格式
+
+### 4. 报告显示
+- Markdown渲染支持
+- 结构化报告展示
+- 一键复制功能
 在需要查询 Next.js, Tailwind CSS, autogens, python相关文档时，务必使用 Context7 以获取最新的、版本相关的文档信息：
 
 ### Next.js 文档搜索

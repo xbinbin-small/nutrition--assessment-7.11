@@ -16,7 +16,8 @@
       "Bash(true)",
       "Bash(ls:*)",
       "Bash(cat:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(conda:*)"
     ],
     "deny": []
   }
