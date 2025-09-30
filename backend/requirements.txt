@@ -1,9 +1,22 @@
-pyautogen
-python-dotenv
-openai
-google-generativeai
-vertexai
-Pillow
-jsonschema
+# AutoGen框架
+pyautogen==0.9.0
+
+# AI模型SDK
+google-generativeai==0.8.5
+openai==1.97.1
+
+# 环境配置
+python-dotenv==1.1.0
+
+# 图像处理
+Pillow>=10.0.0
+
+# 数据验证
+jsonschema==4.23.0
+
+# HTTP客户端和SSL
 httpx>=0.28.1
 certifi>=2025.6.15
+
+# Google Cloud (可选)
+# vertexai

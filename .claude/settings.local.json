@@ -10,7 +10,10 @@
       "Bash(npm:*)",
       "Bash(cat:*)",
       "Read(//Users/binmacbook/Desktop/**)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(pip freeze)",
+      "Bash(chmod:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

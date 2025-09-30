@@ -1,8 +1,15 @@
 services:
   - type: web
-    name: nutrition-frontend
+    name: nutrition-assessment-app
     runtime: node
-    buildCommand: npm install && npm run build
+    plan: starter
+    buildCommand: |
+      # 安装Node.js依赖
+      npm ci
+      # 安装Python依赖
+      pip install -r backend/requirements.txt
+      # 构建Next.js应用
+      npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -11,15 +18,6 @@ services:
         sync: false
       - key: DEEPSEEK_API_KEY
         sync: false
-
-  - type: web
-    name: nutrition-backend
-    runtime: python3
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
-    envVars:
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: DEEPSEEK_API_KEY
-        sync: false
-    rootDir: backend
+      - key: PYTHON_VERSION
+        value: "3.11"
+    healthCheckPath: /api/health
