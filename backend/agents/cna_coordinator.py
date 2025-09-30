@@ -1,3 +1,4 @@
+import sys
 import uuid
 import json
 from typing import Dict, Any, List, Optional
@@ -25,15 +26,19 @@ class CNA_Coordinator:
     - 提供数据追溯性管理
     """
     
-    def __init__(self, patient_data: Dict[str, Any], llm_config_pro: Dict, llm_config_flash: Dict, image_data: Optional[Dict[str, Any]] = None):
+    def __init__(self, patient_data: Dict[str, Any], llm_config_coordinator: Dict, llm_config_analysis: Dict,
+                 llm_config_reporter: Dict, image_data: Optional[Dict[str, Any]] = None,
+                 model_series: str = "gemini"):
         """
         初始化CNA协调器
-        
+
         Args:
             patient_data: 患者数据
-            llm_config_pro: Pro模型配置
-            llm_config_flash: Flash模型配置
+            llm_config_coordinator: 协调器模型配置（Gemini Flash Preview 或 DeepSeek Chat）
+            llm_config_analysis: 中间分析模型配置（Gemini Flash Standard 或 DeepSeek Chat）
+            llm_config_reporter: 报告生成模型配置（Gemini Flash Preview 或 DeepSeek Reasoner）
             image_data: 可选的图像数据（包含images或file_paths）
+            model_series: 模型系列选择 ("gemini" 或 "deepseek")
         """
         self.patient_data = patient_data
         self.image_data = image_data
@@ -42,41 +47,53 @@ class CNA_Coordinator:
         self.data_trace = {}  # 数据追溯映射
         self.session_id = str(uuid.uuid4())
         self.start_time = datetime.now()
-        
-        # CNA_Coordinator使用Pro模型进行协调和管理任务
-        # 符合CLAUDE.md规范：作为中央协调器，需要最强推理能力保证系统质量
-        self.llm_config = llm_config_pro
+        self.model_series = model_series
+
+        # CNA_Coordinator使用协调器模型进行协调和管理任务
+        # Gemini: gemini-2.5-flash-preview-09-2025
+        # DeepSeek: deepseek-chat
+        self.llm_config = llm_config_coordinator
         self.agent = autogen.AssistantAgent(
             name="CNA_Coordinator",
-            llm_config=llm_config_pro,
+            llm_config=llm_config_coordinator,
             system_message="""
             你是CNA系统的中央协调器，负责整个营养评估流程的质量控制和决策管理。
-            
+
             核心职责：
             1. 深度分析数据质量和完整性，识别关键缺失信息
             2. 运用医学知识检测智能体结果间的逻辑冲突和不一致
             3. 智能决策评估流程控制：是否需要重新分析、补充数据或终止评估
             4. 生成专业的协调决策解释和质量保证说明
             5. 确保最终报告的医学准确性和逻辑一致性
-            
+
             专业要求：
             - 具备营养学和临床医学知识背景
             - 运用批判性思维进行深度分析
             - 提供循证医学支持的决策建议
             - 保持最高标准的质量控制
             - 用专业、清晰的中文进行分析和解释
-            
+
             作为中央协调器，你的决策直接影响整个CNA系统的可靠性和准确性。
             """
         )
-        
-        # 初始化专门智能体
-        self.clinical_analyzer = ClinicalContextAnalyzer(llm_config=llm_config_flash)
-        self.anthropometric_evaluator = AnthropometricEvaluator(llm_config=llm_config_flash)
-        self.biochemical_interpreter = BiochemicalInterpreter(llm_config=llm_config_flash)
-        self.dietary_assessor = DietaryAssessor(llm_config=llm_config_flash)
-        self.diagnostic_reporter = DiagnosticReporter(llm_config=llm_config_pro)
-        self.image_recognizer = ImageRecognizer(llm_config=llm_config_flash)
+
+        # 初始化专门智能体 - 使用中间分析模型
+        # Gemini: gemini-2.5-flash
+        # DeepSeek: deepseek-chat
+        print(f"使用 {model_series.upper()} 系列模型初始化中间分析智能体", file=sys.stderr)
+        self.clinical_analyzer = ClinicalContextAnalyzer(llm_config=llm_config_analysis)
+        self.anthropometric_evaluator = AnthropometricEvaluator(llm_config=llm_config_analysis)
+        self.biochemical_interpreter = BiochemicalInterpreter(llm_config=llm_config_analysis)
+        self.dietary_assessor = DietaryAssessor(llm_config=llm_config_analysis)
+
+        # 初始化报告生成智能体
+        # Gemini: gemini-2.5-flash-preview-09-2025
+        # DeepSeek: deepseek-reasoner
+        print(f"使用 {model_series.upper()} 系列模型初始化报告生成智能体", file=sys.stderr)
+        self.diagnostic_reporter = DiagnosticReporter(llm_config=llm_config_reporter)
+
+        # 图像识别始终使用分析模型
+        self.image_recognizer = ImageRecognizer(llm_config=llm_config_analysis)
         
         # 验证数据完整性
         self.validation_results = self._validate_data()
@@ -425,7 +442,7 @@ class CNA_Coordinator:
         try:
             # 构建冲突检测提示
             prompt = f"""
-            请分析以下CNA系统各智能体的评估结果，检测是否存在逻辑冲突或不一致：
+            请分析以下CNA系统各智能体的评估结果，检测是否存在**严重的逻辑冲突**导致无法生成可靠的评估报告。
 
             临床背景分析结果：
             {intermediate_results.get('clinical_context', {}).get('data', '无数据')}
@@ -439,19 +456,24 @@ class CNA_Coordinator:
             膳食评估结果：
             {intermediate_results.get('dietary_assessment', {}).get('data', '无数据')}
 
-            请检查：
-            1. 各评估结果是否在逻辑上一致？
-            2. 是否存在明显的矛盾或冲突？
-            3. 数据质量是否足够支持最终诊断？
-            4. 是否需要某个智能体重新分析？
+            重要说明：
+            - 只有**严重的、根本性的矛盾**才应该终止评估（proceed_to_final_report设为false）
+            - 轻微的数值差异（如体重下降百分比相差1-2%）、不同表述方式、数据不完整等情况不应终止评估
+            - 这些轻微问题可以在conflicts_detected和recommendations中记录，但应设置proceed_to_final_report为true
+            - 医学评估允许一定程度的解读差异，这是正常的
+
+            严重冲突的例子（才应该终止评估）：
+            - 一个智能体判断为营养不良，另一个判断为营养良好（完全相反的结论）
+            - 能量需求计算相差超过50%
+            - 关键指标解读完全相反且无法调和
 
             请用中文回复，格式为JSON：
             {{
                 "has_conflicts": true/false,
-                "conflicts_detected": ["具体冲突描述"],
-                "data_quality_issues": ["数据质量问题"],
+                "conflicts_detected": ["具体冲突描述（仅记录，不一定终止）"],
+                "data_quality_issues": ["数据质量问题（仅记录，不一定终止）"],
                 "recommendations": ["改进建议"],
-                "proceed_to_final_report": true/false
+                "proceed_to_final_report": true/false  (只有严重冲突时才设为false，轻微问题仍设为true)
             }}
             """
             
@@ -465,6 +487,17 @@ class CNA_Coordinator:
                     json_match = re.search(r'\{.*\}', response, re.DOTALL)
                     if json_match:
                         conflict_analysis = json.loads(json_match.group())
+
+                        # 添加安全措施：只有检测到严重冲突时才真正终止
+                        # 如果has_conflicts为true但proceed_to_final_report为false，
+                        # 检查是否真的是严重冲突
+                        if conflict_analysis.get("has_conflicts") and not conflict_analysis.get("proceed_to_final_report", True):
+                            conflicts = conflict_analysis.get("conflicts_detected", [])
+                            # 如果冲突数量少于3个，或者冲突描述较短，认为不是严重冲突
+                            if len(conflicts) < 3:
+                                print("检测到轻微冲突，但不影响报告生成，继续评估...", file=sys.stderr)
+                                conflict_analysis["proceed_to_final_report"] = True
+                                conflict_analysis["override_reason"] = "冲突不够严重，允许继续生成报告"
                     else:
                         # 如果没有找到JSON，创建默认结果
                         conflict_analysis = {

@@ -24,7 +24,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ result }) => {
 
   // The report is now expected to have bolded titles.
   // We'll split by newlines and render accordingly.
-  const reportLines = report.split('\n').filter((line: string) => line.trim() !== '');
+  const reportLines = (report || '').split('\n').filter((line: string) => line.trim() !== '');
 
   return (
     <div className="space-y-4">

@@ -6,11 +6,16 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     console.log("Received body:", JSON.stringify(body, null, 2));
-    const patientData = body;
+
+    // 支持新的请求格式: {patient_data: ..., model_series: ...} 或旧的格式(直接patient数据)
+    const patientData = body.patient_data || body;
+    const modelSeries = body.model_series || body.selected_model || 'gemini'; // 向后兼容selected_model
 
     if (!patientData) {
       return NextResponse.json({ error: 'Patient data is required' }, { status: 400 });
     }
+
+    console.log(`Selected model series: ${modelSeries}`);
 
     const backendPath = path.join(process.cwd(), 'backend');
     const pythonProcess = spawn('python3', ['main.py'], { cwd: backendPath });
@@ -26,8 +31,12 @@ export async function POST(request: Request) {
       errorData += data.toString();
     });
 
-    // Write patient data to the Python script's stdin
-    const dataString = JSON.stringify(patientData);
+    // Write patient data and model series to the Python script's stdin
+    const inputData = {
+      patient_data: patientData,
+      model_series: modelSeries
+    };
+    const dataString = JSON.stringify(inputData);
     console.log("Writing to python stdin:", dataString);
     pythonProcess.stdin.write(dataString);
     pythonProcess.stdin.end();

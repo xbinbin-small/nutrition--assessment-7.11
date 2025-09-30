@@ -1,7 +1,37 @@
 import sys
 import json
+import logging
+import os
+
+# 保存原始stdout
+original_stdout = sys.stdout
+
+# 临时将stdout重定向到stderr，防止第三方库的日志污染stdout
+# 我们会在最后恢复stdout来输出JSON结果
+sys.stdout = sys.stderr
+
+# 配置日志：所有日志都输出到stderr
+logging.basicConfig(
+    level=logging.WARNING,  # 只显示WARNING及以上级别
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stderr,
+    force=True
+)
+
+# 抑制autogen和相关库的日志
+logging.getLogger('autogen').setLevel(logging.ERROR)
+logging.getLogger('openai').setLevel(logging.ERROR)
+os.environ['AUTOGEN_SILENT'] = '1'
+
 from agents.cna_coordinator import CNA_Coordinator
-from config import llm_config_pro, llm_config_flash
+from config import (
+    llm_config_gemini_flash_standard,
+    llm_config_gemini_flash_preview,
+    llm_config_deepseek_chat,
+    llm_config_deepseek_reasoner,
+    DEEPSEEK_API_KEY,
+    GEMINI_API_KEY
+)
 
 def consolidate_patient_data(documents: list) -> dict:
     """
@@ -72,12 +102,35 @@ def consolidate_patient_data(documents: list) -> dict:
 if __name__ == "__main__":
     try:
         input_data = sys.stdin.read()
-        
+
         if not input_data:
             print(json.dumps({"error": "No input data received from stdin."}), file=sys.stderr)
             sys.exit(1)
 
         parsed_data = json.loads(input_data)
+
+        # 检查新格式：{patient_data: ..., model_series: ...} 或旧格式（直接patient数据）
+        model_series = None
+        if isinstance(parsed_data, dict) and 'patient_data' in parsed_data and 'model_series' in parsed_data:
+            patient_data_input = parsed_data['patient_data']
+            model_series = parsed_data['model_series']
+            print(f"收到前端模型系列选择: {model_series}", file=sys.stderr)
+            parsed_data = patient_data_input  # 替换为患者数据
+        # 向后兼容旧的selected_model字段
+        elif isinstance(parsed_data, dict) and 'patient_data' in parsed_data and 'selected_model' in parsed_data:
+            patient_data_input = parsed_data['patient_data']
+            selected_model = parsed_data['selected_model']
+            # 转换旧的模型名称到新的系列名称
+            if selected_model == 'deepseek':
+                model_series = 'deepseek'
+            else:
+                model_series = 'gemini'
+            print(f"收到旧格式模型选择，转换为: {model_series}", file=sys.stderr)
+            parsed_data = patient_data_input
+        else:
+            # 兼容最旧格式
+            print("使用默认模型系列: gemini", file=sys.stderr)
+            model_series = 'gemini'
         
         # 检查是否包含图像数据
         image_data = None
@@ -99,11 +152,57 @@ if __name__ == "__main__":
             sys.exit(1)
 
         # 初始化协调器并运行评估（可选传入图像数据）
-        coordinator = CNA_Coordinator(patient_json, llm_config_pro, llm_config_flash, image_data=image_data)
+        # 根据前端选择的模型系列，配置相应的模型
+
+        # 验证API密钥可用性
+        gemini_available = GEMINI_API_KEY is not None and GEMINI_API_KEY.strip() != ""
+        deepseek_available = DEEPSEEK_API_KEY is not None and DEEPSEEK_API_KEY.strip() != "" and DEEPSEEK_API_KEY != "your_deepseek_api_key_here"
+
+        # 根据选择的模型系列和可用性确定使用的配置
+        if model_series == 'deepseek':
+            if not deepseek_available:
+                print("DeepSeek API密钥未配置，回退到Gemini系列", file=sys.stderr)
+                model_series = 'gemini'
+
+        if model_series == 'deepseek':
+            print("=" * 60, file=sys.stderr)
+            print("使用 DeepSeek 系列模型:", file=sys.stderr)
+            print("  • 中间分析智能体: deepseek-chat", file=sys.stderr)
+            print("  • 协调管理: deepseek-chat", file=sys.stderr)
+            print("  • 报告生成: deepseek-reasoner", file=sys.stderr)
+            print("=" * 60, file=sys.stderr)
+
+            coordinator = CNA_Coordinator(
+                patient_json,
+                llm_config_coordinator=llm_config_deepseek_chat,
+                llm_config_analysis=llm_config_deepseek_chat,
+                llm_config_reporter=llm_config_deepseek_reasoner,
+                image_data=image_data,
+                model_series='deepseek'
+            )
+        else:
+            print("=" * 60, file=sys.stderr)
+            print("使用 Gemini 系列模型:", file=sys.stderr)
+            print("  • 中间分析智能体: gemini-2.5-flash", file=sys.stderr)
+            print("  • 协调管理: gemini-2.5-flash-preview-09-2025", file=sys.stderr)
+            print("  • 报告生成: gemini-2.5-flash-preview-09-2025", file=sys.stderr)
+            print("=" * 60, file=sys.stderr)
+
+            coordinator = CNA_Coordinator(
+                patient_json,
+                llm_config_coordinator=llm_config_gemini_flash_preview,
+                llm_config_analysis=llm_config_gemini_flash_standard,
+                llm_config_reporter=llm_config_gemini_flash_preview,
+                image_data=image_data,
+                model_series='gemini'
+            )
+
         result = coordinator.run_assessment()
-        
-        # Print final result to stdout
+
+        # Restore original stdout and print final result
+        sys.stdout = original_stdout
         print(json.dumps(result, ensure_ascii=False))
+        sys.stdout.flush()  # Ensure output is written
 
     except json.JSONDecodeError:
         print(json.dumps({"error": "Failed to decode JSON from stdin.", "received_data": input_data}), file=sys.stderr)

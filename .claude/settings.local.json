@@ -1,24 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install)",
-      "Bash(npm audit:*)",
-      "Bash(pip3:*)",
       "Bash(npm run dev:*)",
+      "Bash(python3:*)",
+      "Bash(find:*)",
       "Bash(lsof:*)",
-      "Bash(pkill:*)",
-      "Bash(curl:*)",
-      "Bash(python:*)",
+      "Bash(awk:*)",
       "Bash(node:*)",
       "Bash(npm:*)",
-      "Bash(pip install:*)",
-      "Bash(timeout 10 npm run dev)",
-      "Bash(true)",
-      "Bash(ls:*)",
       "Bash(cat:*)",
-      "Bash(mkdir:*)",
-      "Bash(conda:*)"
+      "Read(//Users/binmacbook/Desktop/**)",
+      "Bash(grep:*)"
     ],
-    "deny": []
+    "deny": [],
+    "ask": []
   }
 }

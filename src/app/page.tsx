@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ReportDisplay from "@/components/ReportDisplay";
+import StructuredTextForm from "@/components/StructuredTextForm";
 
 interface ImageRecognitionResult {
   id: string;
@@ -18,8 +19,10 @@ export default function Home() {
   const [copySuccess, setCopySuccess] = useState("");
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imageRecognitionResults, setImageRecognitionResults] = useState<ImageRecognitionResult[]>([]);
-  const [inputMode, setInputMode] = useState<"json" | "image">("json");
+  const [inputMode, setInputMode] = useState<"json" | "image" | "text">("json");
   const [isIntegrating, setIsIntegrating] = useState(false);
+  const [isProcessingText, setIsProcessingText] = useState(false);
+  const [selectedModelSeries, setSelectedModelSeries] = useState<"gemini" | "deepseek">("gemini");
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -271,6 +274,42 @@ export default function Home() {
     setIsIntegrating(false);
   };
 
+  // 处理文本录入
+  const handleTextProcessing = async (formattedText: string) => {
+    if (!formattedText.trim()) {
+      alert("请输入医疗文本内容");
+      return;
+    }
+
+    setIsProcessingText(true);
+
+    try {
+      const res = await fetch("/api/process-text", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: formattedText,
+          model_series: selectedModelSeries
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("文本处理失败");
+      }
+
+      const result = await res.json();
+
+      // 将处理后的结果设置到患者数据输入框
+      setPatientData(JSON.stringify(result.extracted_data, null, 2));
+    } catch (error) {
+      alert(`文本处理出错: ${error instanceof Error ? error.message : "未知错误"}`);
+    } finally {
+      setIsProcessingText(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setIsLoading(true);
     setAssessmentResult("");
@@ -293,7 +332,10 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(parsedData),
+        body: JSON.stringify({
+          patient_data: parsedData,
+          model_series: selectedModelSeries
+        }),
       });
 
       if (!res.ok) {
@@ -377,6 +419,17 @@ export default function Home() {
             </button>
             <button
               type="button"
+              onClick={() => setInputMode("text")}
+              className={`px-4 py-2 text-sm font-medium ${
+                inputMode === "text"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              } border-t border-b border-gray-200`}
+            >
+              文本录入
+            </button>
+            <button
+              type="button"
               onClick={() => setInputMode("image")}
               className={`px-4 py-2 text-sm font-medium rounded-r-lg ${
                 inputMode === "image"
@@ -391,6 +444,25 @@ export default function Home() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="flex flex-col">
+            {inputMode === "text" && (
+              <div className="mb-4">
+                <h3 className="mb-4 text-lg font-semibold text-gray-800">
+                  结构化医疗文本录入
+                </h3>
+                <StructuredTextForm
+                  onSubmit={handleTextProcessing}
+                  isProcessing={isProcessingText}
+                />
+                {patientData && (
+                  <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-sm text-green-700">
+                      ✓ 文本已成功解析为结构化数据，请在下方JSON编辑器中检查并修改
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {inputMode === "image" && (
               <div className="mb-4">
                 <label className="mb-2 font-semibold text-gray-700 block">
@@ -496,6 +568,11 @@ export default function Home() {
                   (数据已整合，请检查并编辑)
                 </span>
               )}
+              {inputMode === "text" && patientData && (
+                <span className="text-sm text-green-600 ml-2">
+                  (文本已解析，请检查并编辑)
+                </span>
+              )}
             </label>
             <textarea
               id="patientData"
@@ -505,6 +582,54 @@ export default function Home() {
               value={patientData}
               onChange={(e) => setPatientData(e.target.value)}
             />
+
+            {/* 报告生成模型选择 */}
+            <div className="mt-4 p-4 bg-gray-50 rounded-md border">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                AI模型系列选择
+              </label>
+              <div className="flex flex-col gap-3">
+                <label className="flex items-start cursor-pointer p-3 border rounded-md hover:bg-gray-100 transition-colors">
+                  <input
+                    type="radio"
+                    name="model_series"
+                    value="gemini"
+                    checked={selectedModelSeries === "gemini"}
+                    onChange={(e) => setSelectedModelSeries(e.target.value as "gemini" | "deepseek")}
+                    className="mr-3 mt-1"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium text-blue-700">Gemini系列模型</span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      • 中间分析: gemini-2.5-flash<br/>
+                      • 协调管理: gemini-2.5-flash-preview-09-2025<br/>
+                      • 报告生成: gemini-2.5-flash-preview-09-2025<br/>
+                      • 特点: 快速响应，成本优化
+                    </p>
+                  </div>
+                </label>
+                <label className="flex items-start cursor-pointer p-3 border rounded-md hover:bg-gray-100 transition-colors">
+                  <input
+                    type="radio"
+                    name="model_series"
+                    value="deepseek"
+                    checked={selectedModelSeries === "deepseek"}
+                    onChange={(e) => setSelectedModelSeries(e.target.value as "gemini" | "deepseek")}
+                    className="mr-3 mt-1"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium text-purple-700">DeepSeek系列模型</span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      • 中间分析: deepseek-chat<br/>
+                      • 协调管理: deepseek-chat<br/>
+                      • 报告生成: deepseek-reasoner<br/>
+                      • 特点: 增强推理，高质量分析
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <button
               onClick={handleSubmit}
               disabled={isLoading || !patientData}
