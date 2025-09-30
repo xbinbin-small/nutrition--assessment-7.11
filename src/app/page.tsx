@@ -12,9 +12,49 @@ interface ImageRecognitionResult {
   error?: string;
 }
 
+interface LabResult {
+  name: string;
+  value: string;
+  unit: string;
+  interpretation: string;
+}
+
+interface IntegratedData {
+  patient_info: {
+    height_cm?: number;
+    weight_kg?: number;
+    bmi?: number;
+    weight_loss_percentage?: string;
+    [key: string]: any;
+  };
+  diagnoses: any[];
+  lab_results: {
+    biochemistry: LabResult[];
+    complete_blood_count: LabResult[];
+    stool_routine: any[];
+  };
+  symptoms_and_history: any;
+  treatment_plan: any;
+  consultation_record: {
+    NRS2002_score?: number;
+    nutritional_assessment?: string;
+    [key: string]: any;
+  };
+  raw_recognized_data: {
+    document_type: string;
+    data: any;
+  }[];
+}
+
+interface AssessmentResult {
+  report?: string;
+  error?: string;
+  [key: string]: any;
+}
+
 export default function Home() {
   const [patientData, setPatientData] = useState("");
-  const [assessmentResult, setAssessmentResult] = useState("");
+  const [assessmentResult, setAssessmentResult] = useState<AssessmentResult | string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState("");
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
@@ -125,7 +165,7 @@ export default function Home() {
       .map(r => r.result);
     
     // 整合数据
-    const integratedData = {
+    const integratedData: IntegratedData = {
       patient_info: {},
       diagnoses: [],
       lab_results: {
