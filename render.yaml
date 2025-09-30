@@ -6,8 +6,9 @@ services:
     buildCommand: |
       # 安装Node.js依赖
       npm ci
-      # 安装Python依赖
-      pip install -r backend/requirements.txt
+      # 安装Python依赖（使用python3 -m pip确保使用正确的pip）
+      python3 -m pip install --upgrade pip
+      python3 -m pip install -r backend/requirements.txt
       # 构建Next.js应用
       npm run build
     startCommand: npm start
