@@ -2,26 +2,32 @@ import sys
 import json
 import logging
 import os
+import io
 
 # 保存原始stdout
 original_stdout = sys.stdout
 
-# 临时将stdout重定向到stderr，防止第三方库的日志污染stdout
-# 我们会在最后恢复stdout来输出JSON结果
-sys.stdout = sys.stderr
+# 创建一个null输出流来丢弃不需要的输出
+null_stream = open(os.devnull, 'w')
+
+# 临时将stdout重定向到null，防止第三方库的日志污染stdout
+sys.stdout = null_stream
 
 # 配置日志：所有日志都输出到stderr
 logging.basicConfig(
-    level=logging.WARNING,  # 只显示WARNING及以上级别
+    level=logging.ERROR,  # 只显示ERROR级别
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     stream=sys.stderr,
     force=True
 )
 
-# 抑制autogen和相关库的日志
-logging.getLogger('autogen').setLevel(logging.ERROR)
-logging.getLogger('openai').setLevel(logging.ERROR)
+# 抑制所有相关库的日志
+logging.getLogger('autogen').setLevel(logging.CRITICAL)
+logging.getLogger('openai').setLevel(logging.CRITICAL)
+logging.getLogger('httpx').setLevel(logging.CRITICAL)
+logging.getLogger('httpcore').setLevel(logging.CRITICAL)
 os.environ['AUTOGEN_SILENT'] = '1'
+os.environ['OPENAI_LOG_LEVEL'] = 'error'
 
 from agents.cna_coordinator import CNA_Coordinator
 from config import (
@@ -200,6 +206,7 @@ if __name__ == "__main__":
         result = coordinator.run_assessment()
 
         # Restore original stdout and print final result
+        null_stream.close()  # 关闭null流
         sys.stdout = original_stdout
         print(json.dumps(result, ensure_ascii=False))
         sys.stdout.flush()  # Ensure output is written
